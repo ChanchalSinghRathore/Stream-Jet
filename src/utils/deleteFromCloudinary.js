@@ -1,20 +1,23 @@
-import { v2 as cloudinary } from 'cloudinary';
+import { v2 as cloudinary } from 'cloudinary'
 
 export const deleteFromCloudinary = async (imageUrl) => {
   try {
-    if (!imageUrl) return;
+    if (!imageUrl) return
 
-    // Extract the public_id from the Cloudinary URL
-    const url = new URL(imageUrl);
-    const parts = url.pathname.split('/');
-    const fileName = parts.pop(); // e.g. avatar_xxx123.jpg
-    const folder = parts.slice(2).join('/'); // remove the first 2 segments: '', 'image', 'upload'
+    // Parse URL and extract path
+    const url = new URL(imageUrl)
+    const pathnameParts = url.pathname.split('/') // e.g. [ '', 'image', 'upload', 'v1754176625', 'fdr2j5r9fxyz.jpg' ]
 
-    const publicId = `${folder}/${fileName.split('.')[0]}`; // remove .jpg/.png
+    // Get file name from last segment
+    const fileWithExt = pathnameParts.pop() // e.g. "fdr2j5r9fxyz.jpg"
+    const publicId = fileWithExt.split('.')[0] // e.g. "fdr2j5r9fxyz"
 
-    const result = await cloudinary.uploader.destroy(publicId);
-    console.log("Cloudinary image deleted:", result);
-  } catch (err) {
-    console.error("Error deleting image from Cloudinary:", err.message);
+    // ✅ Delete from Cloudinary
+    const result = await cloudinary.uploader.destroy(publicId)
+
+   
+    return result
+  } catch (error) {
+    console.error('❌ Cloudinary deletion error:', error.message)
   }
-};
+}

@@ -4,7 +4,8 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import { Mongoose } from "mongoose";
+import { mongoose } from "mongoose";
+import {deleteFromCloudinary} from "../utils/deleteFromCloudinary.js"
 
 const generateAccessandRefreshTokens = async (userId) => {
   try {
@@ -215,7 +216,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
   const user = await User.findById(req.user?._id)
   
-  const isPasswordCorrect = await User.isPasswordCorrect(oldPassword)
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
   if (!isPasswordCorrect) {
     throw new ApiError(401, "Old password is incorrect");
@@ -261,6 +262,9 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
 })
 
 const updateUserAvatar = asyncHandler(async(req, res) => {
+
+  const oldAvatarUser = await User.findById(req.user?._id);
+
   const avatarLocalPath = req.file?.path
 
   if (!avatarLocalPath) {
@@ -273,7 +277,6 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
     throw new ApiError(400, "Avatar upload failed")
   }
 
-  const oldAvatarUser = await User.findById(req.user?._id);
 
   const user = await User.findByIdAndUpdate(
     req.user?._id,
@@ -285,9 +288,9 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
     {new: true}
   ).select("-password")
 
-  if (oldAvatarUser?.avatar) {
-    await deleteFromCloudinary(oldAvatarUser.avatar);
-  }
+  if (oldAvatarUser?.avatar && oldAvatarUser.avatar !== avatar.url) {
+  await deleteFromCloudinary(oldAvatarUser.avatar)
+}
 
    return res.status(200).json(new ApiResponse(200, user, "Avatar updated successfully" ))
 
@@ -327,7 +330,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
     throw new ApiError(400, "username is missing")
   }
 
-  const channel = User.aggregate([
+  const channel = await User.aggregate([
     {
       $match: {
         username: username?.toLowerCase()
@@ -392,11 +395,11 @@ const getWatchHistory =  asyncHandler(async(req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: new Mongoose.Types.ObjectId(req.user._id)
+        _id: new mongoose.Types.ObjectId(req.user._id)
       }
     },
     {
-      $lookup:{
+      $lookup: {
         from: "videos",
         localField: "watchHistory",
         foreignField: "_id",
@@ -420,17 +423,18 @@ const getWatchHistory =  asyncHandler(async(req, res) => {
             }
           },
           {
-            $addFields: 
-            {
+            $addFields: {
+            owner: {
               $first: "$owner"
             }
+          }
           }
         ]
       }
     }
   ])
 
-  return res(200).json(new ApiResponse(200, user[0].watchHistory, "Watch history fetched successfully"))
+  return res .status(200).json(new ApiResponse(200, user[0].watchHistory, "Watch history fetched successfully"))
 
 })
 
