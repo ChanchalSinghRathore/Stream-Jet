@@ -10,6 +10,45 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
     //TODO: get all videos based on query, sort, pagination
+    const filter = { isPublished: true };
+
+    if (query) {
+        filter.$or = [
+            { title: { $regex: query, $options: "i" } },
+            { description: { $regex: query, $options: "i" } }
+        ];
+    }
+    if (userId) {
+        if (!isValidObjectId(userId)) {
+            throw new ApiError(400, "Invalid user ID");
+        }
+        filter.owner = userId;
+    }
+
+    const sortOptions = {};
+    if (sortBy) {
+        const sortField = sortBy;
+        const sortOrder = sortType === "desc" ? -1 : 1;
+        sortOptions[sortField] = sortOrder;
+    }
+    const videos = await Video.find(filter)
+        .sort(sortOptions)
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit))
+        .populate("owner", "name email");
+    const totalVideos = await Video.countDocuments(filter);
+
+    res
+    .status(200)
+    .json(new ApiResponse(200, {
+        videos,
+        pagination: {
+            total: totalVideos,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(totalVideos / limit)
+        }
+    }, "Videos fetched successfully"))
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
